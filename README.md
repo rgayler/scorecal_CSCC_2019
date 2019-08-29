@@ -1,6 +1,7 @@
 # scorecal_CSCC_2019
 
 <!-- badges: start -->
+[![DOI](https://zenodo.org/badge/205238383.svg)](https://zenodo.org/badge/latestdoi/205238383)
 <!-- badges: end -->
 
 This repository contains an executable `R` notebook

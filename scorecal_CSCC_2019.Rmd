@@ -1224,7 +1224,7 @@ This presentation is implemented as an executable `R` notebook,
 which is publicly accessible on GitHub at:
 [`github.com/rgayler/scorecal_CSCC_2019`](https://github.com/rgayler/scorecal_CSCC_2019)
 
-https://doi.org/10.5281/zenodo.3381631  
+https://doi.org/10.5281/zenodo.3381641  
 
 \vspace{12pt}   
 
