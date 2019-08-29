@@ -10,7 +10,7 @@ given by
 on 2019-08-30
 at the conference 
 [Credit Scoring & Credit Control XVI](http://crc.business-school.ed.ac.uk/category/conference-papers/2019/)
-in Edinburgh, Scotland.
+in Edinburgh, UK.
 
 The notebook contains all the `R` code
 used to simulate and analyse the data
