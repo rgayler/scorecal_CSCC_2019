@@ -2,8 +2,8 @@
 title: scorecal
 subtitle: Empirical score calibration under the microscope
 author: Ross W. Gayler
-date: 30/08/2019 - Credit Scoring & Credit Control XVI
-institute: www.rossgayler.com
+date: 30/08/2019 - Credit Scoring & Credit Control XVI, Edinburgh, UK
+institute: https://www.rossgayler.com --- https://orcid.org/0000-0003-4679-585X
 output: binb::metropolis 
 classoption: "aspectratio=169"
 fontsize: 12pt
@@ -1224,7 +1224,7 @@ This presentation is implemented as an executable `R` notebook,
 which is publicly accessible on GitHub at:
 [`github.com/rgayler/scorecal_CSCC_2019`](https://github.com/rgayler/scorecal_CSCC_2019)
 
-DOI: [PLACEHOLDER_DOI](http://PLACEHOLDER_URL)  
+https://doi.org/10.5281/zenodo.3381631  
 
 \vspace{12pt}   
 
