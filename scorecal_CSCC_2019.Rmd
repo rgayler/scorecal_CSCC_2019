@@ -1,0 +1,1242 @@
+---
+title: scorecal
+subtitle: Empirical score calibration under the microscope
+author: Ross W. Gayler
+date: 30/08/2019 - Credit Scoring & Credit Control XVI
+institute: www.rossgayler.com
+output: binb::metropolis 
+classoption: "aspectratio=169"
+fontsize: 12pt
+---
+
+```{r LICENSE, include=FALSE}
+# "scorecal - Empirical score calibration under the microscope" (c) by Ross W. Gayler
+# 
+# "scorecal - Empirical score calibration under the microscope" is licensed under a
+# Creative Commons Attribution 4.0 International License.
+# 
+# You should have received a copy of the license along with this
+# work. If not, see http://creativecommons.org/licenses/by/4.0/.
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=FALSE)
+
+set.seed(47) # for reproducibility
+
+# This notebook requires the binb package to enable rendering the output as a PDF presentation.
+# It uses the binb metropolis template. 
+# This requires a variety of LaTeX tools and fonts to be installed,
+# in addition to the rmarkdown and knitr infrastructure.
+# See http://github.com/eddelbuettel/binb for binb installation advice.
+
+library(tidyverse) # data manipulation
+library(grid) # for composing multiple plots
+library(cowplot) # add marginal density to plots
+library(patchwork) # arrange multiple plots
+library(sn) # skew-normal distributions
+library(binom) # for confidence intervals of proportions
+library(mgcv) # for smoothed fits
+library(fastDummies) # for dummy coding of individual scores for spike detection
+library(glue) # for constructing model formulae in spike detection
+library(glmnet) # for selection of scores as predictors of spikes 
+library(glmnetUtils) # for selection of scores as predictors of spikes 
+
+```
+
+```{r util_fns, include=FALSE}
+# utility functions
+logit2p <- function(
+  logit # numeric vector - logits
+  # value # numeric vector - probabilities corresponding to logits
+) {
+  odds <- exp(logit)
+  odds / (1 + odds)
+}
+
+p2logit <- function(
+  p # numeric vector - probabilities
+  # value # numeric vector - logits corresponding to probabilities
+) {
+  log(p / (1 - p))
+}
+```
+
+# Introduction
+
+## What is score calibration?
+
+- _Calibration_: Answers the question "What do my scores mean?"
+  by empirically determining function from score to expected value of some outcome statistic
+  - Inherently about groups (cases with the same score)
+  - Case outcome is binary (e.g. Good, Bad)
+  - Outcome statistic is some function of binary outcomes of a group of cases  
+    (e.g. $Pr( Bad | score)$ or $logit( Pr( Good | score))$)
+  - Result of calibration is a function from score to outcome statistic
+    - Fitting a function to the data (i.e. curve fitting)
+    - Typically, the function is approximately linear from score to log-odds
+    
+- _Scaling_: Transform group outcome statistic to a desired scale  
+  - e.g. 1:1 odds $\mapsto$ zero points; double odds $\mapsto$ $\Delta$ +100 points
+  - Think of converting temperature from Fahrenheit to Celsius
+  - Calibration is always on *some* scale,
+    maybe not the one you want
+  
+## Calibration parameters
+  
+Calibration depends on:
+
+- Substantive parameters
+  - Score definition (function from case attributes to a number)
+    - Number is commonly integer, may be real
+  - Population of cases
+  - Outcome definition
+  
+- Technical parameters of calibration function estimation
+  - Curve fitting technique
+  - Fitting technique tuning parameters
+
+## How is the calibration function used?
+
+- Operational process management
+  - Set decision thresholds
+  - Make loss predictions
+  
+- Technical diagnosis of the scoring model (my focus)
+  - For a well-behaved scoring model, 
+    the score to log-odds function is generally quite linear
+    (by definition)
+  - Nonlinearity indicates there is possibly a problem
+    - What is the problem? (shape of nonlinearity - not absolutely diagnostic)
+    - Does the problem matter? (size of nonlinearity)
+    - How to fix the problem? ("fix" may be a work-around)
+
+## Calibration function zoo
+
+Some calibration function patterns that may be encountered:
+
+```{r cal_zoo, echo = FALSE, out.width = "65%", fig.align = "center"}
+# ```{r cal_zoo, echo = FALSE, fig.align = "center"}
+# function to plot a single calibration sketch
+cal_sketch <- function(
+  d, # data frame - with score and logit columns
+  t # character[1] - title for plot
+  # value # ggplot plot object
+  )
+{
+  d %>% 
+    ggplot(aes(x = score, y = logit)) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+    xlab("score") + ylab("log-odds(outcome)") + # axis labels
+    labs(title = t[1]) + # label the plot
+    geom_path(size = 1, lineend = "round", linejoin = "round") # add the calibration curve
+}
+
+### generate each of the calibration sketch plots ###
+
+# linear
+p_linear <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  +1,     +1
+) %>% 
+  cal_sketch("Linear")
+
+# bent
+p_bent <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -0.5,
+   0,      0,
+  +1,     +1
+) %>% 
+  cal_sketch("Change of slope")
+
+# extreme flat
+p_ext_flat <-
+tibble::tribble(
+  ~score, ~logit,
+  -1.3,   -1,
+  -1,     -1,
+  +1,     +1,
+  +1.3,   +1
+) %>% 
+  cal_sketch("Extremes flat")
+
+# extreme reversal
+p_ext_rev <-
+tibble::tribble(
+  ~score, ~logit,
+  -1.3,   -0.8,
+  -1,     -1,
+  +1,     +1,
+  +1.3,   +0.8
+) %>% 
+  cal_sketch("Extremes reversed")
+
+# mid flat
+p_mid_flat <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  -0.15,   0,
+  +0.15,   0,
+  +1,     +1
+) %>%
+  cal_sketch("Locally flat")
+
+# mid reversal
+p_mid_rev <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  -0.15,  +0.1,
+  +0.15,  -0.1,
+  +1,     +1
+) %>%
+  cal_sketch("Locally reversed")
+
+# spike
+p_spike <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  -0.01,     -0.01,
+   0,     +0.4,
+  +0.01,   +0.01,
+  +1,     +1
+) %>%
+  cal_sketch("Spike")
+
+### arrange all the sketches as a single plot ###
+
+p_linear + p_bent + p_ext_flat + p_ext_rev +
+  patchwork::plot_spacer() + p_mid_flat + p_mid_rev + p_spike +
+  patchwork::plot_layout(ncol = 4)
+```
+
+## Typical approaches to calibration function estimation
+
+- Logistic regression from score to outcome, over cases
+  - `glm(outcome == "Good" ~ score, family=binomial)`
+  - Estimated function *forced* to be linear
+    - Unless you use `poly(score)` - but there are better ways
+    - Blind to any nonlinearities
+
+- Score bands
+  - Group scores into bands; calculate outcome statistic for each band
+  - Calibration function is a step-function
+  - Doesn't assume *any* relationship between neighbouring bands
+    - Can model any relationship (*coarsely* - because of band widths)
+    - Local patterns may be hidden by bands (because of band widths)
+    - Doesn't make efficient use of data (doesn't use score ordering)
+  - Typically small number of observations per band
+    - Large variance of estimates obscures patterns
+  
+## Score band approach
+
+```{r mk_sim_data_sb, echo = FALSE}
+# make simulated data for score band plots
+n_obs <- 2e3 # number of observations
+
+# true calibration curve slope and intercept
+sim_slope <- 1
+sim_intercept <- 3
+
+# divide data into score bands
+n_sb <- 10 # number of score bands
+
+# Function to calculate log-odds from score
+# Assumes score to log-odsds relationship is linear
+score2logit_linear <- function(
+  score, # numeric vector - scores
+  slope = 1, # numeric scalar - slope of relationship
+  intercept = 0 # numeric scalar - intercept of relationship
+  # value # numeric vector - logits corresponding to scores
+) {
+  slope * score + intercept
+}
+
+# generate data frame of simulated cases
+d_sim1 <- 
+  tibble::tibble( 
+    # make distribution of scores skew normal
+    score = sn::rsn(n_obs, dp = sn::cp2dp(c(mean = 0, sd = 1, gamma1 = -0.7), family = "SN"))
+  ) %>% 
+  dplyr::mutate(
+    logit = score2logit_linear(score, sim_slope, sim_intercept), # true outcome log-odds
+    prob = logit2p(logit), # true outcome probability
+    outcome_01 = as.integer(runif(length(prob)) <= prob), # randomly realise outcome from true probability
+    outcome = dplyr::if_else(outcome_01 == 1, "Good", "Bad") # also express outcome with pretty labels
+  )
+```
+
+Simulated data with linear score to log-odds relationship
+(n = `r format(n_obs, big.mark = ",")`; `r round(100 * (1 - mean(d_sim1$outcome_01)))`% Bad; `r n_sb` bands)  
+
+```{r score_band_plot, echo=FALSE, out.width = "65%", fig.align = "center"}
+### Plot step-function calibration function based on score bands
+
+# calculate summary statistics per score band
+d_sb <- d_sim1 %>% 
+  dplyr::mutate(
+    score_band = dplyr::ntile(score, n_sb)  # calculate score band
+  ) %>% 
+  # calculate score band stats
+  dplyr::group_by(score_band) %>% 
+  dplyr::summarise(
+    n = n(),
+    n_good = sum(as.integer(outcome == "Good")),
+    score_min = min(score),
+    score_max = max(score),
+    score = mean(score),
+    p = n_good / n,
+    logit = p2logit(p)
+  ) %>% 
+  # calculate score band boundaries
+  dplyr::arrange(score_max) %>% 
+  dplyr::mutate(
+    # Put band boundary midway between highest score below and lowest score above
+    # Upper bound of top score band is NA
+    upper_bound = (score_max + dplyr::lead(score_min)) / 2
+  )
+
+# Calculate data frame for step-function
+# Graft on appropriate values for the begiining and end of the step-function
+d_step <- tibble::tibble(
+  score = c(min(d_sim1$score),  na.omit(d_sb$upper_bound), max(d_sim1$score)),
+  logit = c(d_sb$logit, d_sb$logit[n_sb])
+  )
+
+### plot the score band step-function ###
+
+# construct the main scatterplot  
+p_main <-
+  d_sim1 %>% # individual case data
+  ggplot(aes(x = score, y = logit)) +
+  # general layout
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("log-odds(outcome)") + # axis labels
+  
+  # show true calibration function for individual cases
+  geom_point(aes(x = score, y = logit, colour = outcome), size = 0.1, alpha = 0.5) +
+  
+  # score bands and step-function calibration
+  geom_vline(xintercept = d_sb$upper_bound, colour = "grey", na.rm = TRUE) + # score band boundaries
+  geom_point(aes(x = score, y = logit), data = d_sb, size = 3) + # score band estimate of calibration curve
+  geom_step(aes(x = score, y = logit), data = d_step, direction = "hv") + # add step-function calibration curve
+  
+  # show individual case outcomes as rugs
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim1, outcome == "Good"), sides = "t") + # show Good cases
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim1, outcome == "Bad"), sides = "b") + # show Bad cases
+  guides(colour = guide_legend(reverse = TRUE)) # make order legend order agree with rug order
+
+# marginal density plot
+p_xaxis <-
+  cowplot::axis_canvas(p_main, axis = "x", data = d_sim1) +
+  geom_density(aes(x = score, fill = outcome), alpha = 0.5, colour = "white", size = 0.2)
+
+# compose the plots
+cowplot::insert_xaxis_grob(p_main, p_xaxis, height = grid::unit(0.1, "null"), position = "top") %>% 
+  cowplot::ggdraw()
+```
+
+# scorecal
+
+## scorecal objectives
+
+scorecal: An `R` package for score calibration
+
+Be a better microscope for examining deviations from linearity
+in calibration functions
+
+Issues to be addressed:
+
+- Use data efficiently (assume continuity and smoothness)
+- Relative magnitude of linear and nonlinear components
+- Common scores
+- Sparsity of cases in extreme tails
+- Spike deviations
+
+## Use data efficiently - issue & approach
+
+- Score band approach does not make efficient use of data
+  because it assumes:
+  - No relationship between neighbouring bands
+  - No significance to ordering of scores within bands
+  
+- Expect neighbouring scores to have similar outcome statistics  
+  (continuity of scores and smoothness of calibration curve)
+  - Use smoothing spline or local regression models
+  - Cases "borrow strength" from their neighbours
+    (like having a moving-window estimator)
+  - The effective number of cases used per score value is higher,
+    giving narrower confidence intervals
+  - But, outcome statistic estimates at neighbouring point values are correlated
+    (which follows from assuming smoothness)
+    
+## Use data efficiently - example
+
+The same simulated data (95% confidence intervals)
+
+```{r data_efficiency, echo=FALSE, out.width = "65%", fig.align = "center"}
+ci_conf_level <- 0.95 # total probability covered by CI
+ci_width <- qnorm(1 - (1 - ci_conf_level)/2) # half-width of confidence intervals - in standard errors
+
+# calculate standard errors of scoreband estimates
+d_sb <- d_sb %>% 
+  with(binom::binom.confint(n_good, n, conf.level = ci_conf_level, methods = "lrt")) %>% 
+  dplyr::select(
+    p_lo = lower,
+    p_hi = upper
+  ) %>% 
+  dplyr::mutate(
+    logit_lo = p2logit(p_lo),
+    logit_hi = p2logit(p_hi)
+  ) %>% 
+  dplyr::bind_cols(d_sb, .)
+                
+# fit a smooth GAM and get standard errors
+fit <- mgcv::gam(outcome == "Good" ~ s(score), family = binomial, data = d_sim1)
+d_sim1_extra <- predict(fit, se.fit = TRUE) %>% 
+  tibble::as_tibble() %>% 
+  dplyr::bind_cols(d_sim1, .)
+
+# get the smooth fit at distinct scores
+d_distinct <- d_sim1_extra %>% 
+  dplyr::distinct(score, .keep_all = TRUE) %>% 
+  dplyr::arrange(score)
+
+# colours for smooth and step calibration curves
+col_smooth <- "olivedrab4"
+col_step <- "darkorange"
+
+# graphically compare smooth and step-function calibrations 
+d_sim1_extra %>% # individual case data
+  # general layout
+  ggplot(aes(x = score, y = logit)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("log-odds(outcome)") + # axis labels
+  
+  # marginal rugs
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim1_extra, outcome == "Good"), sides = "t") + # show Good cases
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim1_extra, outcome == "Bad"), sides = "b") + # show Bad cases
+  guides(colour = guide_legend(reverse = TRUE)) + # make order legend order agree with rug order
+  
+  # smooth calibration curve confidence interval
+  geom_ribbon(aes(x = score, ymin = fit - ci_width*se.fit, ymax = fit + ci_width*se.fit),
+              data = d_distinct, fill = col_smooth, alpha = 0.4) +
+  
+  # true calibration curve
+  geom_abline(slope = sim_slope, intercept = sim_intercept, linetype = "dotted", size = 1) + # data simulation parameters
+
+  # step-function calibration curve
+  geom_linerange(aes(x = score, ymin = logit_lo, ymax = logit_hi), data= d_sb, colour = col_step, size = 5, alpha = 0.5) +
+  geom_step(aes(x = score, y = logit), data = d_step, direction = "hv", colour = col_step, size = 1, alpha = 1) + # add step-function calibration curve
+
+  # smooth calibration curve
+  geom_line(aes(x = score, y = fit), data = d_distinct, colour = col_smooth, size = 1)
+```
+
+## Relative magnitude of linear and nonlinear components - issue & approach
+
+- Global linear trend is expected pattern
+- Global linear trend generally much stronger than nonlinearities
+  - Nonlinearities are harder to see when combined with the strong linear component
+- Decompose calibration function into linear and nonlinear components
+  - Fit linear model and use as offset in nonlinear models
+  - Regularisation of nonlinear component
+    makes the linear component the default pattern
+    when data is sparse (similar effect to a Bayesian prior)
+- Display nonlinear components separately
+
+## Relative magnitude of linear and nonlinear components - example
+
+```{r decompose_curve, fig.height = 3,  echo = FALSE, out.width = "100%", fig.align = "center"}
+# function to plot calibration sketch
+cal_sketch <- function(
+  d, # data frame - with score and logit columns
+  t # character[1] - title for plot
+  # value # ggplot plot object
+  )
+{
+  d %>% 
+    ggplot(aes(x = score, y = logit)) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+    xlab("score") + ylab("log-odds(outcome)") + # axis labels
+    xlim(c(-1, +1)) +  ylim(c(-1, +1)) +
+    coord_equal() +
+    labs(title = t[1]) + # label the plot
+    geom_path(size = 1, lineend = "round", linejoin = "round") # add the calibration curve
+}
+
+# mid reversal
+p_mid_rev <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  -0.15,  +0.1,
+  +0.15,  -0.1,
+  +1,     +1
+) %>%
+  cal_sketch("Calibration function")
+# +
+#   geom_abline(slope = 1, intercept = 0, colour = "grey")
+
+# linear
+p_linear <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,     -1,
+  +1,     +1
+) %>% 
+  cal_sketch("Linear component")
+
+# residual of mid reversal realtive to linear
+p_resid <-
+tibble::tribble(
+  ~score, ~logit,
+  -1,      0,
+  -0.15,  +0.25,
+  +0.15,  -0.25,
+  +1,      0
+) %>%
+  cal_sketch("Nonlinear component") +
+  geom_hline(yintercept = 0, colour = "grey")
+
+p_equal <-
+  ggplot() + 
+  theme_void() +
+  geom_blank() +
+  xlim(c(-1, +1)) +  ylim(c(-1, +1)) +
+  coord_equal() +
+  annotate("text", x = 0, y = 0, label = "=", size = 20)
+
+p_plus <-
+  ggplot() + 
+  theme_void() +
+  geom_blank() +
+  xlim(c(-1, +1)) +  ylim(c(-1, +1)) +
+  coord_equal() +
+  annotate("text", x = 0, y = 0, label = "+", size = 20)
+
+p_mid_rev +
+  p_equal + 
+  p_linear +
+  p_plus + 
+  p_resid +
+  patchwork::plot_layout(ncol = 5, widths = c(2, 1, 2, 1, 2))
+```
+
+
+## Common scores - issue & approach
+
+For discrete scores, some score values are very common 
+(occur on a large fraction of cases),
+e.g. bureau scores for New-to-Bureau cases
+
+- For moving-window estimators with window width set at fixed fraction of cases,  
+  the fraction of cases on a common score may exceed the window width
+  - No variance of the predictor (score) within the window; regression fails 
+- For smoothing-spline estimators, can reduce the effective number of score values
+- Use jittering (add small random noise) to break tied scores
+  - Jittering magnitude chosen to preserve order of scores
+  - (Mostly) does no harm if using a smoothing-spline estimator
+- Average the outcome estimates for all the jittered scores
+  derived from the same unjittered score
+  (i.e. transform the result back to the unjittered scores)
+
+## Common scores - example
+
+Histograms of unjittered and jittered simulated data for a small range of scores
+
+```{r common_scores, echo = FALSE, out.width = "65%", fig.align = "center"}
+# simulate a few scores
+
+d_unjit <- tibble::tibble(
+  score = rep(498:502, times = c(6, 1, 27, 11, 3))
+  )
+
+d_jit <- tibble::tibble(
+  score = jitter(d_unjit$score, factor = 5/4)
+  )
+
+# plot the scores before and after jittering
+ggplot() +
+  theme(panel.grid.minor = element_blank()) + # no minor grid lines
+  geom_bar(aes(x = score), data = d_unjit, fill = "black", width = 0.025, position = "identity") +
+  geom_bar(aes(x = score), data = d_jit, fill = "red", colour = "grey", width = 0.025, position = "identity")
+```
+
+## Sparsity of cases in extreme tails - issue
+
+Distributions of scores tend to be skewed and heavy-tailed
+
+- Cases are sparse in the extreme tails
+  - Confidence interval of fitted calibration curve may be *very* wide in tails
+    - May include positive *and* negative slopes
+  - Pattern is ill-defined in tails 
+    (needs stronger assumptions to extract the pattern)
+  - Extreme tails have small fraction of cases
+    - Generally not practically important
+    - But, tend to be visually dominant
+- Can cause technical problems
+  - May be *very* few cases between smoothing spline knots
+  - May be only one outcome class between smoothing spline knots
+  - Case density may vary strongly within local regression window
+    - Pattern at dense end of window may dominate pattern at sparse end
+
+## Sparsity of cases in extreme tails - approach
+
+- For nonlinear smooth fit, transform jittered score to *normal* density first
+  - Compresses heavy tails; expands light tails
+  - Estimate calibration curve then inverse transform back to original score scale
+  - Transform is to normal density rather than uniform,
+    because uniform is too aggressive
+- Effect of density transform is to increase smoothing where tails are heavy
+  and decrease smoothing where tails are light
+  - Smoothing is effectively low-pass filtering
+  - Compression of tails by transformation shifts frequencies of patterns up
+    - Higher frequencies are attenuated more by the smoothing
+    - Inverse transformation back to original scores shifts frequencies down again
+  - Expansion of tails by transformation does the converse
+
+## Sparsity of cases in extreme tails - example - nonlinear smooth
+
+The same simulated data (nonlinear components; 95% confidence intervals)
+
+```{r transformed_nonlinear_fit, echo = FALSE, out.width = "65%", fig.align = "center"}
+### jitter ####
+
+# utility function to jitter score
+cal_jitter <- function(
+  score # numeric - vector of scores
+  # value: numeric - vector of jittered scores
+) {
+  jitter(score, factor = 5/4)
+}
+
+# # demonstrate jittering
+# d_test <- d_sim1 %>% 
+#   dplyr::mutate(
+#     score = round(score, 1), # simulate a discrete score
+#     score_jit = cal_jitter(score)
+#   )
+# d_test %>% 
+#   ggplot() +
+#   geom_point(aes(x = score, y = score_jit - score))
+
+### linear ###
+
+# utility function to fit linear calibration curve
+cal_lin <- function(
+  score, # numeric - vector of scores
+  outcome # logical - vector of outcomes (TRUE := Good)
+  # value: numeric - vector of fitted linear smooth of outcome (natural logodds scale)
+) {
+  d_local <- tibble::tibble(score, outcome) # combine the score and outcome into a data framne
+  
+  fit_lin <- glm(outcome ~ score, family = binomial, data = d_local) # fit linear calibration
+  predict(fit_lin, newdata = d_local) # return fitted curve
+}
+
+# # demonstrate linear calibration
+# d_test <- d_sim1 %>%
+#   dplyr::mutate(
+#     cal_lin = cal_lin(score, outcome == "Good") # use unjittered score for linear component
+#   )
+# d_test %>%
+#   ggplot() +
+#   geom_point(aes(x = score, y = cal_lin))
+
+### smooth ###
+
+# utility function to fit smooth nonlinear calibration curve with offset
+cal_smooth <- function(
+  score, # numeric - vector of scores
+  outcome, # logical - vector of outcomes (TRUE := Good)
+  offset # numeric - vector of offsets
+  # value: numeric - vector of fitted nonlinear smooth of outcome (natural logodds scale)
+) {
+  d_local <- tibble::tibble(score, outcome) # combine the score and outcome into a data framne
+  
+  fit_smooth <- mgcv::gam(outcome ~ s(score), offset = offset, 
+                          family = binomial, data = d_local) # fit nonlinear smooth calibration with offset
+  predict(fit_smooth, newdata = d_local) # return fitted curve
+}
+
+# # demonstrate nonlinear calibration on untransformed score
+# d_test <- d_sim1 %>%
+#   dplyr::mutate(
+#     score_jit = cal_jitter(score),
+#     cal_lin = cal_lin(score, outcome == "Good"), # use unjittered score for linear component
+#     cal_smooth = cal_smooth(score_jit, outcome == "Good", cal_lin) # use unjittered score for linear component
+#   )
+# d_test %>%
+#   ggplot() +
+#   geom_point(aes(x = score, y = cal_smooth + cal_lin)) +
+#   geom_point(aes(x = score, y = cal_smooth), colour = "red")
+
+### transform ###
+
+# utility function to transform the score to uniform density
+trans_density <- function(
+  score # numeric - vector of scores
+  # value: numeric - vector of scores transformed to uniform density
+) {
+  qnorm(p = (0.999 * dplyr::cume_dist(score) + 0.0005)) # shift ECDF slightly to avoid probability = 1
+}
+
+# # demonstrate transformation of scores on simulated data
+# d_test <- d_sim1 %>%
+#   dplyr::mutate(
+#     score = round(score, 1), # simulate an integer score
+#     score_jit = cal_jitter(score),
+#     score_trans = trans_density(score_jit), # use jittered score for transformation
+#   )
+# d_test %>%
+#   ggplot() +
+#   geom_point(aes(x = score, y = score_trans))
+
+# # demonstrate nonlinear smooth of transformed scores on simulated data
+# d_test <- d_sim1 %>%
+#   dplyr::mutate(
+#     score = round(score, 1), # simulate a discrete score
+#     score_jit = cal_jitter(score),
+#     score_trans = trans_density(score_jit), # use jittered score for transformation
+#     cal_lin = cal_lin(score, outcome == "Good"), # use unjittered score for linear component
+#     cal_smooth = cal_smooth(score_trans, outcome == "Good", cal_lin) # use transformed score for smooth component
+#   ) %>%
+#   # reverse the jittering
+#   # take the mean smoothed outcome for each original discrete score
+#   dplyr::group_by(score) %>%
+#   dplyr::mutate(
+#     cal_smooth = mean(cal_smooth) # merge all jittered scores back to origninal
+#   ) %>%
+#   dplyr::ungroup()
+# d_test %>%
+#   ggplot() +
+#   geom_point(aes(x = score, y = cal_smooth + cal_lin)) +
+#   geom_point(aes(x = score, y = cal_smooth), colour = "red")
+
+### generate slide ###
+
+# compare transformed and untransformed regressions wtih CIs
+
+d_test <- d_sim1 %>%
+  dplyr::mutate(
+    score = round(score, 1), # simulate a discrete score
+    score_jit = cal_jitter(score),
+    score_trans = trans_density(score_jit), # use jittered score for transformation
+    cal_lin = cal_lin(score, outcome == "Good"), # use unjittered score for linear component
+  )
+
+# fit nonlinear components manually to get SEs
+# fit_untrans <- mgcv::gam(outcome == "Good" ~ s(score_jit, bs = "ad"), offset = cal_lin,
+fit_untrans <- mgcv::gam(outcome == "Good" ~ s(score_jit), offset = cal_lin,
+                         family = binomial, data = d_test)
+
+d_test_untrans <- predict(fit_untrans, se.fit = TRUE) %>% 
+  tibble::as_tibble() %>% 
+  dplyr::bind_cols(d_test, .) %>% 
+  dplyr::mutate(
+    type = "untransformed"
+  ) %>% 
+  dplyr::rename(
+    cal_smooth = fit,
+    se_smooth = se.fit
+  )
+
+# fit_trans <- mgcv::gam(outcome == "Good" ~ s(score_trans, bs = "ad"), offset = cal_lin,
+fit_trans <- mgcv::gam(outcome == "Good" ~ s(score_trans), offset = cal_lin,
+                       family = binomial, data = d_test)
+
+d_test_trans <- predict(fit_trans, se.fit = TRUE) %>% 
+  tibble::as_tibble() %>% 
+  dplyr::bind_cols(d_test, .) %>% 
+  dplyr::mutate(
+    type = "transformed"
+  ) %>% 
+  dplyr::rename(
+    cal_smooth = fit,
+    se_smooth = se.fit
+  )
+
+d_test <- 
+  dplyr::bind_rows(d_test_untrans, d_test_trans) %>%
+  dplyr::mutate(
+    type = forcats::fct_relevel(type, "untransformed", "transformed") # get desired order   
+  ) %>% 
+  # reverse the jittering
+  # take the mean smoothed outcome for each original discrete score
+  dplyr::group_by(type, score) %>%
+  dplyr::mutate(
+    cal_smooth = mean(cal_smooth),
+    se_smooth = mean(se_smooth)
+  ) %>%
+  dplyr::ungroup() %>% 
+  dplyr::distinct(type, score, .keep_all = TRUE) %>%  # for plotting we only need 1 record per score x type
+  dplyr::arrange(type, score)
+
+# graphically compare transformed and untransformed calibrations with CIs
+d_test %>%
+  # general layout
+  ggplot() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("nonlinear component log-odds(outcome)") + # axis labels
+  
+  # true calibration curve
+  geom_hline(yintercept = 0, linetype = "dotted", size = 1) + 
+
+  # calibration curve confidence interval
+  geom_ribbon(
+    aes(x = score, 
+        ymin = cal_smooth - ci_width*se_smooth, 
+        ymax = cal_smooth + ci_width*se_smooth,
+        fill = type
+    ),
+    alpha = 0.2) +
+
+  # smooth calibration curve
+  geom_line(aes(x = score, y = cal_smooth, colour = type), size = 1)
+```
+
+## Sparsity of cases in extreme tails - example - total curve
+
+The same simulated data (combined components; 95% confidence intervals)
+
+```{r transformed_combined_fit, echo = FALSE, out.width = "65%", fig.align = "center"}
+# graphically compare transformed and untransformed calibrations with CIs
+d_test %>%
+  # general layout
+  ggplot() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("combined components log-odds(outcome)") + # axis labels
+  
+  # true calibration curve
+  geom_abline(slope = sim_slope, intercept = sim_intercept, linetype = "dotted", size = 1) + # data simulation parameters
+  
+  # calibration curve confidence interval
+  geom_ribbon(
+    aes(x = score, 
+        ymin = cal_lin + cal_smooth - ci_width*se_smooth, 
+        ymax = cal_lin + cal_smooth + ci_width*se_smooth,
+        fill = type
+    ),
+    alpha = 0.2) +
+
+  # smooth calibration curve
+  geom_line(aes(x = score, y = cal_lin + cal_smooth, colour = type), size = 1)
+```
+
+## Spike deviations - issue
+
+- A specific score can have an outcome probability
+  very different from neighbours
+  - Interpretable as the cases in the spike having the wrong score
+  - Possibly due to score calculation error
+  - Possibly due to applying scorecard to a different population
+- Difficult to detect unless the score is a common score
+- Difficult to detect in a continuous scorecard because spikes are spread
+
+## Spike deviations - issue with smoothing approach
+
+- Spike deviations break assumption of smoothness
+- Analysis developed so far *hides* spikes
+
+```{r spike_sketch, echo = FALSE, out.width = "55%", fig.align = "center"}
+tibble::tribble( # define a spike
+  ~score, ~logit,
+  -6,      0,
+  -0.2,    0,
+  -0.1,    1,
+  +0.1,    1,
+  +0.2,    0,
+  +6,      0
+) %>% 
+  ggplot(aes(x = score, y = logit)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("log-odds(outcome)") + # axis labels
+  
+  stat_function(fun = dnorm, colour = "grey4", size = 1) + # draw smoothed spike
+  
+  geom_path(colour = "red", size = 1, lineend = "round", linejoin = "round") # draw spike
+
+```
+
+## Spike deviations - approach
+
+Approach: Model spikes with an indicator variable for each spike score
+
+- Issue: To find the spikes we need an indicator variable for each unique score
+  - Ideally, fit smooth and select spikes simultaneously with regularised regression
+  - This is possible, but I haven't done it yet
+- Current approach:
+  - Pre-filter potential spikes by frequency (say > 1% cases)
+  - Use lasso regression to select spikes with smooth as offset
+  - Re-estimate smooth with selected spikes as added predictors
+
+## Spike deviations - example data
+
+```{r mk_sim_data_spike, echo = FALSE}
+# make simulated data for spike deviation analysis
+
+set.seed(45) # for reproducibility
+
+### utility functions ###
+
+# function to implement piecewise linear slopes
+# multiple calls to this function are added
+above <- function(
+  x, # numeric - vector of score values
+  knot, # numeric[1] - location of knot
+  delta_slope # numeric[1] - change in slope above knot
+  # value - numeric - vector of incremental log-odds values
+) {
+  as.integer(x >= knot) * (x - knot) * delta_slope
+}
+
+# function to implement shape of true calibration curve for main distribution
+# value is in log-odds units
+cal_true <- function(
+  x, # numeric - vector of score values
+  lo_range, # numeric[1] - range from of output in logits
+  p_bad # numeric[1] - target Bad rate (approximate)
+  # value - numeric - vector of log-odds values
+) {
+  # calculate logits (arbitrary scale) as a function of score
+  logit <- 0.0 +
+    above(x, 0.3, +1) +
+    above(x, 0.6, +1) +
+    above(x, 0.9, -2)
+  
+  logit_min <- min(logit)
+  logit_max <- max(logit)
+  logit_range <- logit_max - logit_min
+  logit_mean <- mean(logit)
+  
+  logit_mean_target <- p2logit(1 - p_bad)
+  
+  # rescale logits to have desired range and Bad rate
+  lo_range * (logit - logit_mean) / logit_range + logit_mean_target
+}
+
+n_scores <- 1e3 # number of discrete scores to simulate
+
+n_obs <- 20e3 # total number of observations (including spike)
+p_spike <- 0.05 # fraction of total observations in the spike
+
+# number of observations in the main distribution and spike
+n_spike <- round(n_obs * p_spike)
+n_main <- n_obs - n_spike
+
+# skew normal distribution parameters for main body of observations
+main_mean <- 0.0
+main_sd <- 1.0
+main_gamma1 <- -0.7
+
+lo_range <- 5.0 # range of true calibration curve in logits
+p_bad <- 0.06 # *very approximate* target Bad rate for main distribution of simulated data
+               # this is manually adjusted to achieve the true target value
+
+spike_score <- 0.75 # location of spike on [0,1] score range
+delta_lo_spike <- -1.0 # logit increment of spike relative to main distribution
+
+# make simulated data for main distribution
+d_sim2_main <-
+  # make main distribution of scores skew normal
+  tibble::tibble( 
+    score = sn::rsn(n_main, 
+                    dp = sn::cp2dp(c(mean = main_mean, sd = main_sd, gamma1 = main_gamma1), 
+                                   family = "SN"))
+  ) %>% 
+  dplyr::mutate(
+    # rescale score to n_scores discrete levels over [0,1]
+    score = (cut(score, breaks = n_scores, labels = FALSE) - 1) / (n_scores - 1),
+    # calculate true logit as a function of score
+    logit = cal_true(score, lo_range = lo_range, p_bad = p_bad)
+  )
+
+# turn the extensive definition of the calibration curve into a function
+d_sim2_main_distinct <- d_sim2_main %>% 
+  dplyr::distinct(score, .keep_all = TRUE)
+cal_fun <- with(d_sim2_main_distinct, approxfun(score, logit, rule = 2))
+
+# make simulated data for spike
+d_sim2_spike <-
+  # make main distribution of scores skew normal
+  tibble::tibble( 
+    score = rep(spike_score, times = n_spike) 
+  ) %>% 
+  dplyr::mutate(
+    # calculate true logit of spike at score
+    logit = cal_fun(score) + delta_lo_spike
+  )
+
+# concatenate the cases from the main distribution and spike
+d_sim2 <- dplyr::bind_rows(d_sim2_main, d_sim2_spike) %>% 
+  # calculatr the remaining variables
+  dplyr::mutate(
+    prob = logit2p(logit), # true outcome probability
+    outcome_01 = as.integer(runif(length(prob)) <= prob), # randomly realise outcome from true probability
+    outcome = dplyr::if_else(outcome_01 == 1, "Good", "Bad") # also express outcome with pretty labels
+  )
+
+# calculate distinct data for true calibration punction
+d_sim2_distinct <- d_sim2 %>% 
+  dplyr::distinct(score, logit)
+
+# summary(d_sim2)
+# ggplot(d_sim2) +
+#   geom_histogram(aes(x = score), bins = 100)
+# ggplot(d_sim2) +
+#   geom_point(aes(x = score, y = logit))
+
+# set number of score bands
+n_sb <- 10
+```
+
+New simulated data with nonlinear score to log-odds relationship and a spike deviation  
+(n = `r format(n_obs, big.mark = ",")`; n_spike = `r format(n_spike, big.mark = ",")`; `r round(100 * (1 - mean(d_sim2$outcome_01)))`% Bad; `r n_sb` bands)  
+
+```{r score_band_plot_spike, echo=FALSE, out.width = "55%", fig.align = "center"}
+### Plot step-function calibration function based on score bands
+
+# calculate summary statistics per score band
+d_sb <- d_sim2 %>% 
+  dplyr::mutate(
+    score_band = dplyr::ntile(score, n_sb)  # calculate score band
+  ) %>% 
+  # calculate score band stats
+  dplyr::group_by(score_band) %>% 
+  dplyr::summarise(
+    n = n(),
+    n_good = sum(as.integer(outcome == "Good")),
+    score_min = min(score),
+    score_max = max(score),
+    score = mean(score),
+    p = n_good / n,
+    logit = p2logit(p)
+  ) %>% 
+  # calculate score band boundaries
+  dplyr::arrange(score_max) %>% 
+  dplyr::mutate(
+    # Put band boundary midway between highest score below and lowest score above
+    # Upper bound of top score band is NA
+    upper_bound = (score_max + dplyr::lead(score_min)) / 2
+  )
+
+# Calculate data frame for step-function
+# Graft on appropriate values for the begiining and end of the step-function
+d_step <- tibble::tibble(
+  score = c(min(d_sim2$score),  na.omit(d_sb$upper_bound), max(d_sim2$score)),
+  logit = c(d_sb$logit, d_sb$logit[n_sb])
+  )
+
+### plot the score band step-function ###
+
+# construct the main scatterplot  
+p_main <-
+  d_sim2 %>% # individual case data
+  ggplot(aes(x = score, y = logit)) +
+  # general layout
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("log-odds(outcome)") + # axis labels
+  
+  # show true calibration function
+  geom_line(aes(x = score, y = logit), data = d_sim2_distinct, size = 1.5, linetype = "dotted") +
+  
+  # score bands and step-function calibration
+  geom_vline(xintercept = d_sb$upper_bound, colour = "grey", na.rm = TRUE) + # score band boundaries
+  geom_point(aes(x = score, y = logit), data = d_sb, size = 3) + # score band estimate of calibration curve
+  geom_step(aes(x = score, y = logit), data = d_step, direction = "hv") + # add step-function calibration curve
+  
+  # show individual case outcomes as rugs
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim2, outcome == "Good"), sides = "t") + # show Good cases
+  geom_rug(aes(x = score, colour = outcome), data = subset(d_sim2, outcome == "Bad"), sides = "b") + # show Bad cases
+  guides(colour = guide_legend(reverse = TRUE)) # make order legend order agree with rug order
+
+# marginal density plot
+p_xaxis <-
+  cowplot::axis_canvas(p_main, axis = "x", data = d_sim2) +
+  geom_density(aes(x = score, fill = outcome), adjust = 1/2, alpha = 0.5, colour = "white", size = 0.2)
+
+# compose the plots
+cowplot::insert_xaxis_grob(p_main, p_xaxis, height = grid::unit(0.1, "null"), position = "top") %>% 
+  cowplot::ggdraw()
+```
+
+## Spike deviations - example results
+
+Compare smoothed nonlinear components 
+estimated with and without spike term
+
+```{r transformed_nonlinear_fit_spike_auto, echo = FALSE, out.width = "65%", fig.align = "center"}
+### estimate calibration curve ###
+
+d_test <- d_sim2 %>%
+  dplyr::mutate(
+    score_jit = cal_jitter(score),
+    score_trans = trans_density(score_jit), # use jittered score for transformation
+    cal_lin = cal_lin(score, outcome == "Good"), # use unjittered score for linear component
+    score_factor = forcats::as_factor(score) %>% 
+      forcats::fct_lump(prop = 0.003) %>%  # chosen to get ~60 non-lumped levels
+      forcats::fct_relevel("Other") # make "Other" the first level of the factor
+  ) %>% 
+  fastDummies::dummy_cols(select_columns = "score_factor",
+                          remove_most_frequent_dummy = TRUE,
+                          sort_columns = TRUE) # expand score_factor to dummy columns
+
+var_dummies <- d_test %>% # get the names of the dummy variables
+  names() %>% 
+  stringr::str_subset("^score_factor_")
+
+# fit nonlinear smooth component - with no spike predictors
+fit_trans_nospike <-
+  mgcv::gam(outcome == "Good" ~ s(score_trans), offset = cal_lin,
+            family = binomial, data = d_test)
+# summary(fit_trans_nospike)
+# plot(fit_trans_nospike)
+
+# add smooth-nospike curve to data
+d_test$cal_smooth_nospike <- predict(fit_trans_nospike)
+
+# ggplot(d_test) +
+#   geom_point(aes(x = score, y = cal_smooth_nospike))
+
+form <- 
+  glue::glue(
+    'outcome == "Good" ~ ',
+    glue::glue_collapse(var_dummies, sep = " + ")
+  ) %>%
+  as.formula()
+
+# form
+
+fit_glmnet_spike <- d_test %>% 
+  glmnetUtils::cv.glmnet(formula = form, offset = cal_lin + cal_smooth_nospike,
+                       family = "binomial", standardize = FALSE, intercept = FALSE,
+                       data = . )
+# print(fit_glmnet_spike)
+# plot(fit_glmnet_spike)
+# print(coef(fit_glmnet_spike, s = 'lambda.min'))
+
+var_selected <- suppressMessages(
+  coef(fit_glmnet_spike, s = 'lambda.min') %>% 
+    as.matrix() %>% 
+    tibble::as_tibble(rownames = "var", .name_repair = "universal") %>% 
+    dplyr::rename(coef = ...1) %>% 
+    dplyr::filter(coef != 0.0) %>% 
+    dplyr::pull(var)
+)
+
+form <- 
+  glue::glue_collapse(c('outcome == "Good" ~ s(score_trans)', var_selected), 
+                      sep = " + ") %>%
+  as.formula()
+
+# form
+
+fit_trans_spike <- d_test %>% 
+  mgcv::gam(formula = form, offset = cal_lin,
+                       family = binomial, data = . )
+# summary(fit_trans_spike)
+# plot(fit_trans_spike)
+
+# add smooth + spike curve to data
+d_test$cal_smooth_spike <- predict(fit_trans_spike)
+
+# ggplot(d_test) +
+#   geom_point(aes(x = score, y = cal_smooth_spike))
+
+### generate plots ###
+
+d_test <- d_test %>%
+  # reverse the jittering
+  # take the mean smoothed outcome for each original discrete score
+  dplyr::group_by(score) %>%
+  dplyr::mutate(
+    cal_smooth_nospike = mean(cal_smooth_nospike),
+    cal_smooth_spike = mean(cal_smooth_spike)
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct(score, .keep_all = TRUE) %>%  # for plotting we only need 1 record per score x type
+  dplyr::arrange(score)
+
+# graphically compare transformed and untransformed calibrations
+d_test %>%
+  # general layout
+  ggplot() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + # no grid
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank()) + # no axis marks
+  xlab("score") + ylab("nonlinear smooth + spike component log-odds(outcome)") + # axis labels
+  geom_hline(yintercept = 0, colour = "grey") + # zero line
+
+  # true calibration curve
+  geom_line(aes(x = score, y = logit - cal_lin), linetype = "dotted", size = 1) +
+
+  # smooth calibration curves
+  geom_line(aes(x = score, y = cal_smooth_nospike), size = 2, alpha = 0.5, colour = "grey4") + # no spike
+  geom_line(aes(x = score, y = cal_smooth_spike), size = 2, alpha = 0.5, colour = "red") # with spike
+
+```
+
+## Conclusions
+
+- Calibration curves can be usefully decomposed
+  into linear, smooth nonlinear, and spike components
+  
+- The decomposition can be automated reasonably well
+  - Everything breaks under some circumstances
+  
+- The method is a work in progress
+
+- All the `R` code for this presentation is publicly available
+  - The `R` package will soon be publicly available (very alpha)
+
+## Meta conclusions
+
+Content of analysis - simple stuff can be interesting 
+
+- Useful inferences can be drawn from comparatively restricted evidence
+- Apparently simple problems can be full of subtleties
+
+Tools for analysis - openness and reproducibility are important
+
+- Reproducible computational research
+  - Open source tools
+  - Open source research
+  - Tools to simplify reproducibility
+  - Workflows for reproducibility
+
+## Resources
+
+This presentation is implemented as an executable `R` notebook,
+which is publicly accessible on GitHub at:
+[`github.com/rgayler/scorecal_CSCC_2019`](https://github.com/rgayler/scorecal_CSCC_2019)
+
+DOI: [PLACEHOLDER_DOI](http://PLACEHOLDER_URL)  
+
+\vspace{12pt}   
+
+![](by.png){width=20%}  
+\small
+This presentation is licensed under a
+[Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/)
+\normalsize
+
+\vspace{12pt}   
+\hrule
+\vspace{12pt}   
+
+The scorecal `R` package will be publicly accessible on GitHub at:
+[`github.com/rgayler/scorecal`](https://github.com/rgayler/scorecal)
