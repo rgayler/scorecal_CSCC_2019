@@ -19,6 +19,13 @@ fontsize: 12pt
 # work. If not, see http://creativecommons.org/licenses/by/4.0/.
 ```
 
+```{r WARNING, include = FALSE}
+##### WARNING #####
+# When executing this notebook to create a new "version of record" of the rendered output
+# you must first delete the file session_info.rds
+# See the last code chunk in this notebook for the explanation.
+```
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(cache=FALSE)
 
@@ -41,6 +48,9 @@ library(fastDummies) # for dummy coding of individual scores for spike detection
 library(glue) # for constructing model formulae in spike detection
 library(glmnet) # for selection of scores as predictors of spikes 
 library(glmnetUtils) # for selection of scores as predictors of spikes 
+library(sessioninfo) # to get the software versions for reproducibility
+library(here) # for safe specification of file paths
+library(fs) # file handling utilities
 
 ```
 
@@ -1239,3 +1249,34 @@ This presentation is licensed under a
 
 The scorecal `R` package will be publicly accessible on GitHub at:
 [`github.com/rgayler/scorecal`](https://github.com/rgayler/scorecal)
+
+```{r session_info, include = FALSE}
+# This chunk saves session information to the local file "session_info.rds"
+# so that the vesrsions of R and packages are known for reproducibility purposes.
+# The session info file is only saved if it doesn't already exist.
+# When executing the notebook to create a new "version of record"
+# you must delete the session_info.rds so that it will be recreated
+# to record the current versions.
+# Subsequent executions of this notebook will not overwrite session_info.rds,
+# so that you can muck around with the code without losing track of the way things were.
+
+session_file <- here::here("session_info.rds")
+
+if(! fs::file_exists(session_file)) {
+  sessioninfo::session_info() %>% 
+  saveRDS(file = session_file, ascii = TRUE, compress = FALSE)
+  # Make the file read-only
+  # Your OS may not respect this
+  fs::file_chmod(session_file, fs::fs_perms("r--r--r--"))
+}
+
+# You can retrieve and print the stored session_info object with:
+#
+# si <- readRDS("session_info.rds")
+# print(si)
+#
+# The file is saved as ASCII text, so as a desparate last resort 
+# you could open it with a text editor.
+
+```
+
