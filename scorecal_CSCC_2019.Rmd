@@ -1093,8 +1093,7 @@ d_test <- d_sim2 %>%
       forcats::fct_relevel("Other") # make "Other" the first level of the factor
   ) %>% 
   fastDummies::dummy_cols(select_columns = "score_factor",
-                          remove_most_frequent_dummy = TRUE,
-                          sort_columns = TRUE) # expand score_factor to dummy columns
+                          remove_most_frequent_dummy = TRUE) # expand score_factor to dummy columns
 
 var_dummies <- d_test %>% # get the names of the dummy variables
   names() %>% 
