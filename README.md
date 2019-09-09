@@ -5,6 +5,8 @@
 [![Launch Rstudio Binder](http://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/rgayler/scorecal_CSCC_2019/master?urlpath=rstudio)
 <!-- badges: end -->
 
+## Run this notebook in the cloud
+
 **To run this code without installing anything**,
 click on the "launch binder" badge above.
 This will launch Rstudio on a free, small, cloud instance.
@@ -30,9 +32,9 @@ The limitations at time of writing this are:
 
 The [holepunch](https://github.com/karthik/holepunch) package was used to convert this repository to a docker image for cloud execution. 
 
----
+## Generate the conference presentation
 
-This repository contains an executable `R` notebook
+**This repository contains an executable `R` notebook**
 that generates the presentation "scorecal - Empirical score calibration under the microscope"
 given by 
 [Ross W. Gayler](http://www.rossgayler.com)
@@ -46,21 +48,24 @@ The notebook contains all the `R` code
 used to simulate and analyse the data
 and generate the plots.
 This is in the form of a script rather than a package.
-You are free to modify the scripts to see what happens.
+You are free to modify the script to see what happens.
+If you are using the RstudioIDE,
+edit the notebook file `scorecal_CSCC_2019.Rmd` and execute the relevant code chunks.
+Click the `Knit` button to render a new copy of the presentation slides with the results of your altered code.
 
 This notebook requires the [`binb`](http://github.com/eddelbuettel/binb) package 
 to enable rendering the output as a PDF presentation.
-It uses the `binb` `metropolis` template.
-This requires a variety of LaTeX tools and fonts to be installed,
+It uses the `metropolis` template to set the style of the presentation.
+These require a variety of LaTeX tools and fonts to be installed,
 in addition to the `rmarkdown` and `knitr` infrastructure.
 See (http://github.com/eddelbuettel/binb) for `binb` installation advice.
 
-**Abstract**
+**Conference abstract**
 
 Score calibration is the process of empirically determining the relationship between a score
 and an outcome on some population of interest, 
 and scaling is the process of expressing that relationship in agreed units. 
-Calibration is often treated as a simple matter and attacked with simple tools – 
+Calibration is often treated as a simple matter and attacked with simple tools –
 typically, either assuming the relationship between score and log-odds is linear 
 and fitting a logistic regression with the score as the only covariate, 
 or dividing the score range into bands 
