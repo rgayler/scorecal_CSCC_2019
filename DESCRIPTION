@@ -1,7 +1,7 @@
 Type: Compendium
 Package: scorecal_CSCC_2019
 Title: Generate the Presentation 'scorecal - Empirical score calibration under the microscope'
-Version: 1.1
+Version: 1.2
 Authors@R: 
     person(given = "Ross W",
            family = "Gayler",
