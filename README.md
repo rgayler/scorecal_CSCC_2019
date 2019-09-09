@@ -49,8 +49,9 @@ used to simulate and analyse the data
 and generate the plots.
 This is in the form of a script rather than a package.
 You are free to modify the script to see what happens.
-If you are using the RstudioIDE,
+If you are using the Rstudio IDE,
 edit the notebook file `scorecal_CSCC_2019.Rmd` and execute the relevant code chunks.
+The results will be displayed in the notebook immdeiately after the code chunks.
 Click the `Knit` button to render a new copy of the presentation slides with the results of your altered code.
 
 This notebook requires the [`binb`](http://github.com/eddelbuettel/binb) package 
