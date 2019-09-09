@@ -8,16 +8,17 @@
 **To run this code without installing anything**,
 click on the "launch binder" badge above.
 This will launch Rstudio on a free, small, cloud instance.
-It may take a few minutes to launch an initialise.
+It may take a few minutes to launch and initialise.
 
 You will eventually get a web browser tab with the Rstudio IDE running in it,
-and with the `scorecal_CSCC_2019` project open in it.
-Open the file `scorecal_CSCC_2019.Rmd` and click the `Knit` button just above the code.
+and with this `scorecal_CSCC_2019` project open in it.
+Open the file `scorecal_CSCC_2019.Rmd` for editing in the Rstudio IDE and click the `Knit` button just above the code.
 This will execute all the code in the notebook and render the results to `scorecal_CSCC_2019.pdf`,
 which will open in a pop-up window.
 
 You can edit the code in the notebook and re-knit it to see what happens.
-More likely, you will want to edit the code and just execute the code without knitting it to PDF.
+More likely, you will want to edit the code and just execute it in the notebook without knitting it to PDF.
+The results of each code chunk will be displayed in the notebook immediately after the code chunk.
 To do that, you will have to find out how to drive Rstudio.
 
 The cloud instance is small, and has various constraints imposed on it.
@@ -39,6 +40,7 @@ on 2019-08-30
 at the conference 
 [Credit Scoring & Credit Control XVI](http://crc.business-school.ed.ac.uk/category/conference-papers/2019/)
 in Edinburgh, UK.
+The presentation, as given, is archived at http://doi.org/10.5281/zenodo.3381658
 
 The notebook contains all the `R` code
 used to simulate and analyse the data

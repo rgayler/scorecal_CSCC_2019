@@ -42,4 +42,4 @@ LazyData: true
 Remotes:
     tidyverse/glue@3ae350a,
     thomasp85/patchwork@fd7958b
-    
+
