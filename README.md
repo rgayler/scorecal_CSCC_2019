@@ -10,13 +10,21 @@
 **To run this code without installing anything**,
 click on the "launch binder" badge above.
 This will launch Rstudio on a free, small, cloud instance.
-It may take a few minutes to launch and initialise.
+It may take a minute or two to launch and initialise.
 
 You will eventually get a web browser tab with the Rstudio IDE running in it,
 and with this `scorecal_CSCC_2019` project open in it.
 Open the file `scorecal_CSCC_2019.Rmd` for editing in the Rstudio IDE and click the `Knit` button just above the code.
 This will execute all the code in the notebook and render the results to `scorecal_CSCC_2019.pdf`,
 which will open in a pop-up window.
+
+The notebook took about two minutes to knit when I tried it.
+There will be many red messages in the `R Markdown` tab while the PDF file is being rendered.
+These can be ignored (provided you get sensible looking output).
+The only difference I could spot is that the font used in the archived presentation 
+is missing from the cloud instance,
+and the default font used in its place has a slightly larger spacing,
+resulting in some text on the slides being slightly too long for the page. 
 
 You can edit the code in the notebook and re-knit it to see what happens.
 More likely, you will want to edit the code and just execute it in the notebook without knitting it to PDF.
@@ -51,7 +59,7 @@ This is in the form of a script rather than a package.
 You are free to modify the script to see what happens.
 If you are using the Rstudio IDE,
 edit the notebook file `scorecal_CSCC_2019.Rmd` and execute the relevant code chunks.
-The results will be displayed in the notebook immdeiately after the code chunks.
+The results will be displayed in the notebook immediately after the code chunks.
 Click the `Knit` button to render a new copy of the presentation slides with the results of your altered code.
 
 This notebook requires the [`binb`](http://github.com/eddelbuettel/binb) package 
