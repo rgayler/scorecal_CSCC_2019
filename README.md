@@ -30,6 +30,14 @@ is missing from the cloud instance,
 and the default font used in its place has a slightly larger spacing,
 resulting in some text on the slides being slightly too long for the page. 
 
+The notebook took about two minutes to knit when I tried it.
+There will be many red messages in the `R Markdown` tab while the PDF file is being rendered.
+These can be ignored (provided you get sensible looking output).
+The only difference I could spot is that the font used in the archived presentation 
+is missing from the cloud instance,
+and the default font used in its place has a slightly larger spacing,
+resulting in some text on the slides being slightly too long for the page. 
+
 You can edit the code in the notebook and re-knit it to see what happens.
 More likely, you will want to edit the code and just execute it in the notebook without knitting it to PDF.
 The results of each code chunk will be displayed in the notebook immediately after the code chunk.
