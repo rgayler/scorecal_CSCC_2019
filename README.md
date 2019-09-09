@@ -62,7 +62,7 @@ The limitations at the time of writing this are:
     instance will die after 10 minutes of inactivity.
   - An instance cannot be kept alive for more than 12 hours
 
-The [holepunch](https://github.com/karthik/holepunch) package was used
+The [holepunch](https://karthik.github.io/holepunch/) package was used
 to convert this repository to a docker image for cloud execution.
 
 ## Generate the conference presentation
@@ -71,8 +71,8 @@ to convert this repository to a docker image for cloud execution.
 the presentation “scorecal - Empirical score calibration under the
 microscope” given by [Ross W. Gayler](http://www.rossgayler.com) on
 2019-08-30 at the conference [Credit Scoring & Credit Control
-XVI](http://crc.business-school.ed.ac.uk/category/conference-papers/2019/)
-in Edinburgh, UK. The presentation, as given, is archived at
+XVI](https://crc.business-school.ed.ac.uk/conferences/) in Edinburgh,
+UK. The presentation, as given, is archived at
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3381658.svg)](https://doi.org/10.5281/zenodo.3381658)
 
 The notebook contains all the `R` code used to simulate and analyse the
@@ -89,9 +89,9 @@ package to enable rendering the output as a PDF presentation. It uses
 the `metropolis` template to set the style of the presentation. These
 require a variety of LaTeX tools and fonts to be installed, in addition
 to the `rmarkdown` and `knitr` infrastructure. See
-(<http://github.com/eddelbuettel/binb>) for `binb` installation advice.
+<http://github.com/eddelbuettel/binb> for `binb` installation advice.
 
-**Conference abstract**
+**Conference presentation abstract**
 
 Score calibration is the process of empirically determining the
 relationship between a score and an outcome on some population of
@@ -135,34 +135,36 @@ Thanks to:
 
 [Jonathan
 Crook](http://www.business-school.ed.ac.uk/staff/jonathan-crook) and the
-[Credit Research Centreat at the University of Edinburgh Business
-School](https://crc.business-school.ed.ac.uk/) for running a great
+[Credit Research Centre, University of Edinburgh Business
+School](https://crc.business-school.ed.ac.uk/), for running a great
 [conference](https://crc.business-school.ed.ac.uk/conferences/).
 
 [Mathew Ling](http://www.mathewling.com/) and the fine folk of
 [ANZORN](http://www.anzopenresearch.org/) for helping me use
-[`holepunch`](https://github.com/karthik/holepunch) to make this
+[`holepunch`](https://karthik.github.io/holepunch/) to make this
 repository remotely executable.
 
 All the maintainers of the `R` packages used in this repository, and the
-maintainers of all their dependencies.
+maintainers of all their
+dependencies.
 
-| maintainer                                   | packages    |
-| :------------------------------------------- | :---------- |
-| Jim Hester <james.f.hester@gmail.com>        | fs, glue    |
-| Hadley Wickham <hadley@rstudio.com>          | tidyverse   |
-| R Core Team <R-core@r-project.org>           | grid        |
-| Claus O. Wilke <wilke@austin.utexas.edu>     | cowplot     |
-| Thomas Lin Pedersen <thomasp85@gmail.com>    | patchwork   |
-| Adelchi Azzalini <adelchi.azzalini@unipd.it> | sn          |
-| Sundar Dorai-Raj <sdorairaj@gmail.com>       | binom       |
-| Simon Wood <simon.wood@r-project.org>        | mgcv        |
-| Jacob Kaplan <jkkaplan6@gmail.com>           | fastDummies |
-| Trevor Hastie <hastie@stanford.edu>          | glmnet      |
-| Hong Ooi <hongooi@microsoft.com>             | glmnetUtils |
-| Gábor Csárdi <csardi.gabor@gmail.com>        | sessioninfo |
-| Kirill Müller <krlmlr+r@mailbox.org>         | here        |
-| Stefan Milton Bache <stefan@stefanbache.dk>  | magrittr    |
-| Yihui Xie <xie@yihui.name>                   | knitr       |
-| Dirk Schumacher <mail@dirk-schumacher.net>   | thankr      |
-| Karthik Ram <karthik.ram@gmail.com>          | holepunch   |
+| maintainer                                   | packages                           |
+| :------------------------------------------- | :--------------------------------- |
+| Hadley Wickham <hadley@rstudio.com>          | dplyr, forcats, stringr, tidyverse |
+| Jim Hester <james.f.hester@gmail.com>        | fs, glue                           |
+| Kirill Müller <krlmlr+r@mailbox.org>         | here, tibble                       |
+| Yihui Xie <xie@yihui.name>                   | knitr, rmarkdown                   |
+| Dirk Eddelbuettel <edd@debian.org>           | binb                               |
+| Sundar Dorai-Raj <sdorairaj@gmail.com>       | binom                              |
+| Claus O. Wilke <wilke@austin.utexas.edu>     | cowplot                            |
+| Jacob Kaplan <jkkaplan6@gmail.com>           | fastDummies                        |
+| Trevor Hastie <hastie@stanford.edu>          | glmnet                             |
+| Hong Ooi <hongooi@microsoft.com>             | glmnetUtils                        |
+| R Core Team <R-core@r-project.org>           | grid                               |
+| Karthik Ram <karthik.ram@gmail.com>          | holepunch                          |
+| Stefan Milton Bache <stefan@stefanbache.dk>  | magrittr                           |
+| Simon Wood <simon.wood@r-project.org>        | mgcv                               |
+| Thomas Lin Pedersen <thomasp85@gmail.com>    | patchwork                          |
+| Adelchi Azzalini <adelchi.azzalini@unipd.it> | sn                                 |
+| Gábor Csárdi <csardi.gabor@gmail.com>        | sessioninfo                        |
+| Dirk Schumacher <mail@dirk-schumacher.net>   | thankr                             |

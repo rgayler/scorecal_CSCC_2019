@@ -69,7 +69,7 @@ The limitations at the time of writing this are:
 * This is meant for interactive and ephemeral interactive coding so an instance will die after 10 minutes of inactivity.
 * An instance cannot be kept alive for more than 12 hours
 
-The [holepunch](https://github.com/karthik/holepunch) package was used to convert this repository to a docker image for cloud execution. 
+The [holepunch](https://karthik.github.io/holepunch/) package was used to convert this repository to a docker image for cloud execution. 
 
 ## Generate the conference presentation
 
@@ -79,7 +79,7 @@ given by
 [Ross W. Gayler](http://www.rossgayler.com)
 on 2019-08-30
 at the conference 
-[Credit Scoring & Credit Control XVI](http://crc.business-school.ed.ac.uk/category/conference-papers/2019/)
+[Credit Scoring & Credit Control XVI](https://crc.business-school.ed.ac.uk/conferences/)
 in Edinburgh, UK.
 The presentation, as given, is archived at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3381658.svg)](https://doi.org/10.5281/zenodo.3381658)
 
@@ -98,9 +98,9 @@ to enable rendering the output as a PDF presentation.
 It uses the `metropolis` template to set the style of the presentation.
 These require a variety of LaTeX tools and fonts to be installed,
 in addition to the `rmarkdown` and `knitr` infrastructure.
-See (http://github.com/eddelbuettel/binb) for `binb` installation advice.
+See http://github.com/eddelbuettel/binb for `binb` installation advice.
 
-**Conference abstract**
+**Conference presentation abstract**
 
 Score calibration is the process of empirically determining the relationship between a score
 and an outcome on some population of interest, 
@@ -144,11 +144,11 @@ and show how they are addressed in the scorecal package.
 Thanks to:
 
 [Jonathan Crook](http://www.business-school.ed.ac.uk/staff/jonathan-crook)
-and the [Credit Research Centreat at the University of Edinburgh Business School](https://crc.business-school.ed.ac.uk/)
+and the [Credit Research Centre, University of Edinburgh Business School](https://crc.business-school.ed.ac.uk/),
 for running a great [conference](https://crc.business-school.ed.ac.uk/conferences/).
 
 [Mathew Ling](http://www.mathewling.com/) and the fine folk of [ANZORN](http://www.anzopenresearch.org/) 
-for helping me use [`holepunch`](https://github.com/karthik/holepunch) to make this repository remotely executable.
+for helping me use [`holepunch`](https://karthik.github.io/holepunch/) to make this repository remotely executable.
 
 All the maintainers of the `R` packages used in this repository,
 and the maintainers of all their dependencies.
@@ -165,24 +165,30 @@ suppressPackageStartupMessages(
 
 thankr::shoulders(where = "package",
                   package = c(
-                    "tidyverse", 
-                    "grid", 
-                    "cowplot", 
-                    "patchwork", 
-                    "sn", 
+                    "binb",
                     "binom", 
-                    "mgcv", 
+                    "cowplot", 
+                    "dplyr",
                     "fastDummies", 
-                    "glue", 
+                    "forcats",
+                    "fs", 
                     "glmnet", 
                     "glmnetUtils", 
-                    "sessioninfo", 
+                    "glue", 
+                    "grid", 
                     "here", 
-                    "fs", 
-                    "magrittr",
+                    "holepunch",
                     "knitr",
+                    "magrittr",
+                    "mgcv", 
+                    "patchwork", 
+                    "rmarkdown",
+                    "sn", 
+                    "sessioninfo", 
+                    "stringr",
                     "thankr",
-                    "holepunch"
+                    "tibble",
+                    "tidyverse"
                   ),
                   include_dependencies = FALSE) %>% 
   dplyr::select(-no_packages) %>% 
