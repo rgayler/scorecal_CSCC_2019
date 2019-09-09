@@ -1,0 +1,2 @@
+# Get GitHub to reclassify `.Rmd` files as R
+*.Rmd linguist-language=R
