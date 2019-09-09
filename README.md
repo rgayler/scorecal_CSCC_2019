@@ -5,6 +5,8 @@
 [![Launch Rstudio Binder](http://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/rgayler/scorecal_CSCC_2019/master?urlpath=rstudio)
 <!-- badges: end -->
 
+## Run this notebook in the cloud
+
 **To run this code without installing anything**,
 click on the "launch binder" badge above.
 This will launch Rstudio on a free, small, cloud instance.
@@ -30,7 +32,7 @@ The limitations at time of writing this are:
 
 The [holepunch](https://github.com/karthik/holepunch) package was used to convert this repository to a docker image for cloud execution. 
 
----
+## Generate the conference presentation
 
 This repository contains an executable `R` notebook
 that generates the presentation "scorecal - Empirical score calibration under the microscope"
