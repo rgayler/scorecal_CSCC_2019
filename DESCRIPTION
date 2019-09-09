@@ -1,0 +1,45 @@
+Type: Compendium
+Package: scorecal_CSCC_2019
+Title: Generate the Presentation 'scorecal - Empirical score calibration under the microscope'
+Version: 1.1
+Authors@R: 
+    person(given = "Ross W",
+           family = "Gayler",
+           role = c("aut", "cre"),
+           email = "ross@rossgayler.com",
+           comment = c(ORCID = "0000-0003-4679-585X"))
+Description: R notebook to generate presentation 'scorecal
+    - Empirical score calibration under the microscope' as presented by
+    Ross W Gayler at Credit Scoring and Credit Control Conference XVI on
+    2019-08-30. Version 1.1 uses the holepunch package to create a free
+    cloudbased R instance to execute the notebook without requiring the
+    user to install any software.
+License: CCBY-4.0
+Depends: 
+    binb,
+    binom,
+    cowplot,
+    dplyr,
+    fastDummies,
+    forcats,
+    fs,
+    glmnet,
+    glmnetUtils,
+    glue,
+    grid,
+    here,
+    knitr,
+    mgcv,
+    patchwork,
+    rmarkdown,
+    sessioninfo,
+    sn,
+    stringr,
+    tibble,
+    tidyverse
+Encoding: UTF-8
+LazyData: true
+Remotes:
+    tidyverse/glue@3ae350a,
+    rstudio/renv@340f9ce
+    
