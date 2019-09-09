@@ -40,7 +40,7 @@ on 2019-08-30
 at the conference 
 [Credit Scoring & Credit Control XVI](http://crc.business-school.ed.ac.uk/category/conference-papers/2019/)
 in Edinburgh, UK.
-The presentation, as given, is archived at http://doi.org/10.5281/zenodo.3381658
+The presentation, as given, is archived at [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3381658.svg)](https://doi.org/10.5281/zenodo.3381658)
 
 The notebook contains all the `R` code
 used to simulate and analyse the data
